@@ -6,7 +6,7 @@ import org.apache.spark.sql.functions.udf
 import org.apache.log4j
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
-//import org.apache.spark.sql.types
+import org.apache.spark.sql.functions.hour
 
 object ParseTransactionData {
 
@@ -21,17 +21,18 @@ object ParseTransactionData {
       val readOption: Map[String, String] = Map("inferSchema" -> "true", "header" -> "true", "delimiter" -> "|")
       val readPath = "G:\\Ishan\\MachineLeaning\\Pramod Data\\raw_transaction.csv"
       val transactionData = spark.read.options(readOption).csv(readPath)
-     // transactionData.printSchema()
+      // transactionData.printSchema()
       val parseMerhantUDF = udf(Utils.parseMerchnat)
       val parseDateTimeUDF = udf(Utils.parseDateTime)
       val parsedTransaction = transactionData.withColumn("Merchant", parseMerhantUDF($"merchant"))
-        .drop($"merchant").withColumn("transaction_time", parseDateTimeUDF($"trans_date", $"trans_time").cast("timestamp"))
-        .drop($"trans_date").drop($"trans_time")
-      /* parsedTransaction.show(false)
-      parsedTransaction.printSchema()*/
-      val parsedTransationIndexed=MLTransformaions.categoryIndexer(parsedTransaction).merchantIndexer().creditCardIndexer().getParsedDataframe().show(100,false)
-     // fParsedTrasaction.show(false)
-     
+        .drop($"merchant").withColumn("transaction_time", parseDateTimeUDF($"trans_date", $"trans_time").cast("timestamp")).drop($"trans_date").drop($"trans_time")
+        .withColumn("hourOFSwipe", hour($"transaction_time"))
+       parsedTransaction.show(false)
+      parsedTransaction.printSchema()
+      val parsedTransationIndexed = MLTransformaions.categoryIndexer(parsedTransaction)
+        .merchantIndexer().creditCardIndexer()
+        .getParsedDataframe()
+      val parsedFeaturesTransaction = MLTransformaions.vectorAssembler(parsedTransationIndexed).show(false)
 
     } catch {
       case e: Exception => println(e.printStackTrace())

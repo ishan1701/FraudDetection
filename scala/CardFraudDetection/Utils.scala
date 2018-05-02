@@ -16,7 +16,17 @@ object Utils {
       merchant
     }
   }*/
-  
+  //2018-04-03 00:00:00|01:59:34
+  val parseDateTime=(date:String,time:String)=>{
+    try {
+      val finalDate=date.split(" +")(0)+" "+time
+      finalDate
+    }
+    catch {
+      case e:Exception=>println(e.printStackTrace())
+      date
+    }
+  }
   // for DataFrame API
   val parseMerchnat = (merchant: String) => {
     try {

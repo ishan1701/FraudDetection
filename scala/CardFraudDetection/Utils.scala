@@ -29,9 +29,6 @@ object Utils {
         merchant
     }
   }
-  def getNumofClusters(df: org.apache.spark.sql.DataFrame) = {
-
-  }
   def checkImbalancedCondition(df: org.apache.spark.sql.DataFrame, spark: org.apache.spark.sql.SparkSession): (Boolean, Int, Int) = {
     import spark.implicits._
     val numOfPositiveRecords = df.filter($"is_fraud" === 0).count().toInt

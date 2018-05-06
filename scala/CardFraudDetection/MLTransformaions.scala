@@ -6,6 +6,7 @@ import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.ml.classification.{ RandomForestClassificationModel, RandomForestClassifier }
+import org.apache.spark.ml.classification.{LogisticRegressionModel,LogisticRegression}
 
 object MLTransformaions {
   private var indexedDF: org.apache.spark.sql.DataFrame = _
@@ -54,12 +55,24 @@ object MLTransformaions {
     vectorAssembler(filteredDfWithLessLabels).unionAll(vectorAssembler(transactionDFAfterSampling))
 
   }
-  def randomForestClassifier(df: org.apache.spark.sql.DataFrame) = {
+  /*def randomForestClassifier(df: org.apache.spark.sql.DataFrame) = {
     val Array(training, test) = df.randomSplit(Array(0.7, 0.3))
     val randomForestEstimator = new RandomForestClassifier().setLabelCol("label").setFeaturesCol("features").setMaxBins(700)
     val model = randomForestEstimator.fit(training)
     val transactionwithPredic = model.transform(test)
-    transactionwithPredic.show()
+    println(transactionwithPredic.count())
+    transactionwithPredic.show(300)
 
+  }*/
+  def logisticRegressionClassifier(df:org.apache.spark.sql.DataFrame)={
+    val Array(training, test) = df.randomSplit(Array(0.7, 0.3))
+    val logisticEstimator=new LogisticRegression().setLabelCol("label").setFeaturesCol("features")
+    val model=logisticEstimator.fit(training)
+    val transactionwithPredic = model.transform(test)
+   println(transactionwithPredic.count())
+//    transactionwithPredic.show(300)
+    transactionwithPredic
+    
   }
-}
+  }
+  

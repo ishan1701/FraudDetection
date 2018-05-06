@@ -25,7 +25,7 @@ object ParseTransactionData {
 
     try {
       val readOption: Map[String, String] = Map("inferSchema" -> "true", "header" -> "true", "delimiter" -> ",")
-      val readPath = "G:\\Ishan\\MachineLeaning\\Pramod Data\\Data\\FinalCardData\\transactions.csv"
+      val readPath = "src\\main\\resources\\transactions.csv"
       //cc_num,first,last,trans_num,trans_date,trans_time,unix_time,category,merchant,amt,merch_lat,merch_long
       val transactionData = spark.read.options(readOption).csv(readPath)
       transactionData.show()

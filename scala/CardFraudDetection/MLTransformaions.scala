@@ -12,9 +12,11 @@ import org.apache.spark.ml.linalg.DenseVector
 import org.apache.spark.ml.linalg.{ Vector, Vectors }
 
 case class trasactionDFKMeans(label: Int, features: Vector)
+
 object MLTransformaions {
   private var indexedDF: org.apache.spark.sql.DataFrame = _
   private var onehotIndexerDF: org.apache.spark.sql.DataFrame = _
+
   def categoryIndexer(df: org.apache.spark.sql.DataFrame = indexedDF) = {
     val indexer = new StringIndexer().setInputCol("category").setOutputCol("categoryIndexed")
     indexedDF = indexer.fit(df).transform(df)
@@ -51,7 +53,7 @@ object MLTransformaions {
     onehotIndexerDF = oneHotEncoder.transform(df)
     this
   }
-  
+
   def getParsedOneHotEncoderDataframe() = {
     onehotIndexerDF
   }
@@ -72,40 +74,39 @@ object MLTransformaions {
     import spark.implicits._
     val filteredDFWithMoreLables = df.filter($"is_fraud" === 0)
     val filteredDfWithLessLabels = df.filter($"is_fraud" === 1)
-    val TransactionWithFeatures = vectorAssemblerForSampling(filteredDFWithMoreLables)
+    val TransactionWithFeatures = vectorAssemblerForSampling(filteredDFWithMoreLables).cache()
     val kMeans = new KMeans().setK(numOfClusters).setMaxIter(30)
     //TransactionWithFeatures.show()
     val data = df.cache()
     val model = kMeans.fit(TransactionWithFeatures)
     val clusterCentres = model.clusterCenters
-    //val transactionDFAfterSampling = spark.sparkContext.parallelize(clusterCentres).map(x => (x, 0)).map(x => Utils.vectorToRDD(x)).toDF()
     val transactionDFAfterSampling = spark.sparkContext.parallelize(clusterCentres).map(x => x.toSparse).map(x => (0, x))
       .map(x => trasactionDFKMeans(x._1, x._2)).toDF()
     vectorAssembler(filteredDfWithLessLabels).select($"label", $"features").unionAll(transactionDFAfterSampling)
 
   }
-  /*  def randomForestClassifier(df: org.apache.spark.sql.DataFrame) = {
+  def randomForestClassifier(df: org.apache.spark.sql.DataFrame, spark: org.apache.spark.sql.SparkSession) = {
+    import spark.implicits._
     val Array(training, test) = df.randomSplit(Array(0.7, 0.3))
     val randomForestEstimator = new RandomForestClassifier().setLabelCol("label").setFeaturesCol("features").setMaxBins(700)
     val model = randomForestEstimator.fit(training)
-    val transactionwithPredic = model.transform(test)
-    println(transactionwithPredic.count())
-    //  transactionwithPredic.show(300)
-    transactionwithPredic
+    val transactionwithPrediction = model.transform(test)
+    println(s"total data count is" + transactionwithPrediction.count())
+    println("count of same label " + transactionwithPrediction.filter($"prediction" === $"label").count())
+    model
+  }
 
-  }*/
-  def logisticRegressionClassifier(df: org.apache.spark.sql.DataFrame, spark: org.apache.spark.sql.SparkSession) = {
+  /* def logisticRegressionClassifier(df: org.apache.spark.sql.DataFrame, spark: org.apache.spark.sql.SparkSession) = {
     import spark.implicits._
     df.cache()
     val Array(training, test) = df.randomSplit(Array(0.7, 0.3))
     val logisticEstimator = new LogisticRegression().setLabelCol("label").setFeaturesCol("features")
     val model = logisticEstimator.fit(training)
-    val transactionwithPredic = model.transform(test)
-    println(s"total data count is $transactionwithPredic.count()")
-    println("count of same label "+transactionwithPredic.filter($"prediction" === $"label").count())
+    val transactionwithPrediction = model.transform(test)
+    println(s"total data count is"+transactionwithPrediction.count())
+    println("count of same label "+transactionwithPrediction.filter($"prediction" === $"label").count())
     model
-  }
-
+  }*/
 
 }
   

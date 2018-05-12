@@ -54,7 +54,7 @@ object ParseTransactionData {
         else
           processedTransationEncoded
       }
-      val LRModel = MLTransformaions.logisticRegressionClassifier(transactionBalanced, spark)
+      val LRModel = MLTransformaions.randomForestClassifier(transactionBalanced, spark)
       LRModel.save(config.getString("modelPath"))
 
     } catch {

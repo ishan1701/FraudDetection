@@ -1,10 +1,16 @@
 package CardFraudDetection
 
 import org.apache.spark.sql.DataFrame
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.ml.linalg.{ Vector, Vectors }
 
 object Utils {
+  def deleteOutputPath(config:com.typesafe.config.Config,fs:org.apache.hadoop.fs.FileSystem)={
+    if(fs.exists(new Path(config.getString("modelPath"))))
+      fs.delete(new Path(config.getString("modelPath")))
+        
+  }
   val parseDateTime = (date: String, time: String) => {
     try {
       val finalDate = date.split(" +")(0) + " " + time
@@ -16,7 +22,7 @@ object Utils {
     }
   }
   // for DataFrame API
-  val parseMerchnat = (merchant: String) => {
+/*  val parseMerchnat = (merchant: String) => {
     try {
       if (merchant.contains("fraud_")) {
         val splitParts = merchant.split("_")
@@ -28,26 +34,35 @@ object Utils {
         println(e.printStackTrace())
         merchant
     }
+  }*/
+  def getDistance (lat1:Double, lon1:Double, lat2:Double, lon2:Double) = {
+    val r : Int = 6371 //Earth radius
+    val latDistance : Double = Math.toRadians(lat2 - lat1)
+    val lonDistance : Double = Math.toRadians(lon2 - lon1)
+    val a : Double = Math.sin(latDistance / 2) * Math.sin(latDistance / 2) + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2)
+    val c : Double = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    val distance : Double = r * c
+    distance
   }
   def checkImbalancedCondition(df: org.apache.spark.sql.DataFrame, spark: org.apache.spark.sql.SparkSession): (Boolean, Int, Int) = {
     import spark.implicits._
     val numOfPositiveRecords = df.filter($"is_fraud" === 0).count().toInt
-    println(s"Nmber of positive is $numOfPositiveRecords")
+    //println(s"Nmber of positive is $numOfPositiveRecords")
     val positiveLabel = 0
     val numofNegetiveRecords = df.count().toInt - numOfPositiveRecords.toInt
-    println(s"Nmber of negative is $numofNegetiveRecords")
+   // println(s"Nmber of negative is $numofNegetiveRecords")
     val negativeLabel = 1
     val totalPoints = numofNegetiveRecords + numOfPositiveRecords
     var numOFClusters = 0
-    println(s"total records= $totalPoints")
+    //println(s"total records= $totalPoints")
 
     if ((numOfPositiveRecords / totalPoints) * 100 < 30) //(true,whichLabeltoReduce,numofClusters
     {
-      println("I am in pos")
+    //  println("I am in pos")
 
       (true, positiveLabel, numofNegetiveRecords)
     } else if (numofNegetiveRecords / totalPoints.toInt * 100 < 30) {
-      println(" iam in Negaitev part")
+     // println(" iam in Negaitev part")
       (true, negativeLabel, numOfPositiveRecords)
     } else
       (false, 0, 0)

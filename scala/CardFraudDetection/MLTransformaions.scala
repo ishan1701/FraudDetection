@@ -6,37 +6,66 @@ import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.ml.classification.{ RandomForestClassificationModel, RandomForestClassifier }
-import org.apache.spark.ml.classification.{LogisticRegressionModel,LogisticRegression}
+import org.apache.spark.ml.classification.{ LogisticRegressionModel, LogisticRegression }
+import org.apache.spark.ml.feature.OneHotEncoder
+import org.apache.spark.ml.linalg.DenseVector
+import org.apache.spark.ml.linalg.{ Vector, Vectors }
 
+case class trasactionDFKMeans(label: Int, features: Vector)
 object MLTransformaions {
   private var indexedDF: org.apache.spark.sql.DataFrame = _
+  private var onehotIndexerDF: org.apache.spark.sql.DataFrame = _
   def categoryIndexer(df: org.apache.spark.sql.DataFrame = indexedDF) = {
     val indexer = new StringIndexer().setInputCol("category").setOutputCol("categoryIndexed")
     indexedDF = indexer.fit(df).transform(df)
     this
   }
   def merchantIndexer(df: org.apache.spark.sql.DataFrame = indexedDF) = {
-    val indexer = new StringIndexer().setInputCol("Merchant").setOutputCol("merchantIndexed")
+    val indexer = new StringIndexer().setInputCol("merchant").setOutputCol("merchantIndexed")
     indexedDF = indexer.fit(df).transform(df)
     this
   }
   def creditCardIndexer(df: org.apache.spark.sql.DataFrame = indexedDF) = {
-    val indexer = new StringIndexer().setInputCol("cc_num").setOutputCol("cc_numIndexed")
+    val indexer = new StringIndexer().setInputCol("cardNum").setOutputCol("cardnumIndexed")
     indexedDF = indexer.fit(df).transform(df)
     this
   }
-  def vectorAssembler(df: org.apache.spark.sql.DataFrame) = {
-    val columnNames = Array("cc_numIndexed", "categoryIndexed", "merchantIndexed", "merch_lat", "merch_long", "amt")
-    val assembler = new VectorAssembler().setInputCols(columnNames).setOutputCol("features")
-    assembler.transform(df).select("is_fraud", "features").withColumnRenamed("is_fraud", "label")
-  }
+
   def getParsedDataframe() = {
     indexedDF
   }
+  def oneHotEncoderCreditCard(df: org.apache.spark.sql.DataFrame = onehotIndexerDF) = {
+    val oneHotEncoder = new OneHotEncoder().setInputCol("cardnumIndexed").setOutputCol("cardnumIndexeddOneHot")
+    onehotIndexerDF = oneHotEncoder.transform(df)
+    this
+
+  }
+  def oneHotEncoderCategory(df: org.apache.spark.sql.DataFrame = onehotIndexerDF) = {
+    val oneHotEncoder = new OneHotEncoder().setInputCol("categoryIndexed").setOutputCol("categoryIndexedOneHot")
+    onehotIndexerDF = oneHotEncoder.transform(df)
+    this
+
+  }
+  def oneHotEncoderMerchant(df: org.apache.spark.sql.DataFrame = onehotIndexerDF) = {
+    val oneHotEncoder = new OneHotEncoder().setInputCol("merchantIndexed").setOutputCol("merchantIndexedOneHot")
+    onehotIndexerDF = oneHotEncoder.transform(df)
+    this
+  }
+  
+  def getParsedOneHotEncoderDataframe() = {
+    onehotIndexerDF
+  }
+
   def vectorAssemblerForSampling(df: org.apache.spark.sql.DataFrame) = {
-    val coloumnNames = Array("cc_numIndexed", "categoryIndexed", "merchantIndexed", "merch_lat", "merch_long", "amt")
+    val coloumnNames = Array("cardnumIndexeddOneHot", "categoryIndexedOneHot", "merchantIndexedOneHot", "age", "distance", "amt")
     val assembler = new VectorAssembler().setInputCols(coloumnNames).setOutputCol("features")
     assembler.transform(df)
+
+  }
+  def vectorAssembler(df: org.apache.spark.sql.DataFrame) = {
+    val columnNames = Array("cardnumIndexeddOneHot", "categoryIndexedOneHot", "merchantIndexedOneHot", "age", "distance", "amt")
+    val assembler = new VectorAssembler().setInputCols(columnNames).setOutputCol("features")
+    assembler.transform(df).withColumnRenamed("is_fraud", "label")
 
   }
   def banlancingDataSet(df: org.apache.spark.sql.DataFrame, numOfClusters: Int, spark: org.apache.spark.sql.SparkSession) = {
@@ -45,34 +74,38 @@ object MLTransformaions {
     val filteredDfWithLessLabels = df.filter($"is_fraud" === 1)
     val TransactionWithFeatures = vectorAssemblerForSampling(filteredDFWithMoreLables)
     val kMeans = new KMeans().setK(numOfClusters).setMaxIter(30)
-    TransactionWithFeatures.show()
+    //TransactionWithFeatures.show()
     val data = df.cache()
     val model = kMeans.fit(TransactionWithFeatures)
     val clusterCentres = model.clusterCenters
-    //    for(i<-clusterCentres)
-    //      println(i)
-    val transactionDFAfterSampling = spark.sparkContext.parallelize(clusterCentres).map(x => (x, 0)).map(x => Utils.vectorToRDD(x)).toDF()
-    vectorAssembler(filteredDfWithLessLabels).unionAll(vectorAssembler(transactionDFAfterSampling))
+    //val transactionDFAfterSampling = spark.sparkContext.parallelize(clusterCentres).map(x => (x, 0)).map(x => Utils.vectorToRDD(x)).toDF()
+    val transactionDFAfterSampling = spark.sparkContext.parallelize(clusterCentres).map(x => x.toSparse).map(x => (0, x))
+      .map(x => trasactionDFKMeans(x._1, x._2)).toDF()
+    vectorAssembler(filteredDfWithLessLabels).select($"label", $"features").unionAll(transactionDFAfterSampling)
 
   }
-  /*def randomForestClassifier(df: org.apache.spark.sql.DataFrame) = {
+  /*  def randomForestClassifier(df: org.apache.spark.sql.DataFrame) = {
     val Array(training, test) = df.randomSplit(Array(0.7, 0.3))
     val randomForestEstimator = new RandomForestClassifier().setLabelCol("label").setFeaturesCol("features").setMaxBins(700)
     val model = randomForestEstimator.fit(training)
     val transactionwithPredic = model.transform(test)
     println(transactionwithPredic.count())
-    transactionwithPredic.show(300)
+    //  transactionwithPredic.show(300)
+    transactionwithPredic
 
   }*/
-  def logisticRegressionClassifier(df:org.apache.spark.sql.DataFrame)={
+  def logisticRegressionClassifier(df: org.apache.spark.sql.DataFrame, spark: org.apache.spark.sql.SparkSession) = {
+    import spark.implicits._
+    df.cache()
     val Array(training, test) = df.randomSplit(Array(0.7, 0.3))
-    val logisticEstimator=new LogisticRegression().setLabelCol("label").setFeaturesCol("features")
-    val model=logisticEstimator.fit(training)
+    val logisticEstimator = new LogisticRegression().setLabelCol("label").setFeaturesCol("features")
+    val model = logisticEstimator.fit(training)
     val transactionwithPredic = model.transform(test)
-   println(transactionwithPredic.count())
-//    transactionwithPredic.show(300)
-    transactionwithPredic
-    
+    println(s"total data count is $transactionwithPredic.count()")
+    println("count of same label "+transactionwithPredic.filter($"prediction" === $"label").count())
+    model
   }
-  }
+
+
+}
   

@@ -31,12 +31,13 @@ object ParseTransactionData {
       val parseDateTimeUDF = udf(Utils.parseDateTime)
       val distanceUDF = udf(Utils.getDistance _)
       Utils.deleteOutputPath(config, fs)
+      transactionData.printSchema()
       val parsedTransaction = transactionData.withColumn("transaction_time", parseDateTimeUDF($"trans_date", $"trans_time").cast("timestamp")).drop("trans_date", "trans_time")
       val processedTransactionDF = parsedTransaction.join(customerData, "cc_num").withColumn("distance", round(distanceUDF($"lat", $"long", $"merch_lat", $"merch_long"), 2)).drop("lat", "long", "merch_lat", "merch_long")
         .withColumn("age", round(datediff($"transaction_time", $"dob") / 365, 2)).withColumn("cardNum", $"cc_num".cast("string"))
         .select($"cardNum", $"age", $"category", $"merchant", $"distance", $"amt", $"is_fraud")
 
-      val processedTransationIndexed = MLTransformaions.categoryIndexer(processedTransactionDF)
+      /*val processedTransationIndexed = MLTransformaions.categoryIndexer(processedTransactionDF)
         .merchantIndexer().creditCardIndexer()
         .getParsedDataframe().persist()
 
@@ -44,7 +45,13 @@ object ParseTransactionData {
         .oneHotEncoderCreditCard()
         .oneHotEncoderMerchant()
         .getParsedOneHotEncoderDataframe()
-
+      
+*/
+      val pipeline=new Pipeline().setStages(Array(MLTransformaions.categoryIndexer,MLTransformaions.merchantIndexer,MLTransformaions.creditCardIndexer,MLTransformaions.oneHotEncoderCategory,MLTransformaions.oneHotEncoderMerchant,MLTransformaions.oneHotEncoderCreditCard))
+      val pipeLineModel=pipeline.fit(processedTransactionDF)
+      pipeLineModel.save(config.getString("pipeLineModelPath"))
+      val processedTransationEncoded=pipeLineModel.transform(processedTransactionDF)
+      processedTransationEncoded.show(5,false)
       val (isImbalanced, labelToRduce, numOfClusters) = Utils.checkImbalancedCondition(processedTransationEncoded, spark)
       //print(s"dataset is $isImbalanced. Label to reeduce -> $labelToRduce. with clusrter= $numOfClusters")
 

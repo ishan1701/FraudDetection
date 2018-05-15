@@ -9,11 +9,14 @@ object Utils {
   def deleteOutputPath(config:com.typesafe.config.Config,fs:org.apache.hadoop.fs.FileSystem)={
     if(fs.exists(new Path(config.getString("modelPath"))))
       fs.delete(new Path(config.getString("modelPath")))
+    if(fs.exists(new Path(config.getString("pipeLineModelPath"))))
+      fs.delete(new Path(config.getString("pipeLineModelPath")))
         
   }
   val parseDateTime = (date: String, time: String) => {
     try {
       val finalDate = date.split(" +")(0) + " " + time
+    
       finalDate
     } catch {
       case e: Exception =>

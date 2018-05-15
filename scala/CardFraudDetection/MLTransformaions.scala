@@ -14,7 +14,7 @@ import org.apache.spark.ml.linalg.{ Vector, Vectors }
 case class trasactionDFKMeans(label: Int, features: Vector)
 
 object MLTransformaions {
-  private var indexedDF: org.apache.spark.sql.DataFrame = _
+  /*private var indexedDF: org.apache.spark.sql.DataFrame = _
   private var onehotIndexerDF: org.apache.spark.sql.DataFrame = _
 
   def categoryIndexer(df: org.apache.spark.sql.DataFrame = indexedDF) = {
@@ -58,6 +58,15 @@ object MLTransformaions {
     onehotIndexerDF
   }
 
+*/  
+  val categoryIndexer=new StringIndexer().setInputCol("category").setOutputCol("categoryIndexed")
+  val merchantIndexer=new StringIndexer().setInputCol("merchant").setOutputCol("merchantIndexed")
+  val creditCardIndexer=new  StringIndexer().setInputCol("cardNum").setOutputCol("cardnumIndexed")
+  val oneHotEncoderCreditCard = new OneHotEncoder().setInputCol("cardnumIndexed").setOutputCol("cardnumIndexeddOneHot")
+  val oneHotEncoderCategory = new OneHotEncoder().setInputCol("categoryIndexed").setOutputCol("categoryIndexedOneHot")
+  val oneHotEncoderMerchant = new OneHotEncoder().setInputCol("merchantIndexed").setOutputCol("merchantIndexedOneHot")
+  
+  
   def vectorAssemblerForSampling(df: org.apache.spark.sql.DataFrame) = {
     val coloumnNames = Array("cardnumIndexeddOneHot", "categoryIndexedOneHot", "merchantIndexedOneHot", "age", "distance", "amt")
     val assembler = new VectorAssembler().setInputCols(coloumnNames).setOutputCol("features")
